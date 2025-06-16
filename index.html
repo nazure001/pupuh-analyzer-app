@@ -109,11 +109,63 @@
 
             <!-- AI Analysis Result -->
             <div id="ai-result-section" class="mt-8 pt-6 border-t border-gray-200">
-                <h2 class="text-2xl font-bold text-center mb-4">🔬 Hasil Analisis AI</h2>
-                <div id="ai-loader" class="flex justify-center items-center py-8 hidden">
-                    <div class="loader"></div>
-                    <p class="ml-4 text-gray-600">Gemini sedang menganalisis...</p>
-                </div>
+  <h2 class="text-2xl font-bold text-center mb-4" id="ai-title">🔬 Hasil Analisis AI</h2>
+
+  <div id="ai-loader" class="flex justify-center items-center py-8 hidden">
+    <div class="loader"></div>
+    <p class="ml-4 text-gray-600" id="ai-status-text">Gemini sedang menganalisis...</p>
+  </div>
+
+  <div id="ai-result-content" class="text-center hidden">
+    <p id="ai-message" class="text-lg text-gray-800"></p>
+  </div>
+</div>
+
+<script>
+  // Array of random titles and statuses
+  const titles = [
+    '🔍 AI Sedang Memindai...',
+    '🧠 Otak Digital Berpikir...',
+    '📊 Proses Analisa Dimulai...',
+    '⚙️ Mengurai Data Kompleks...'
+  ];
+
+  const loadingMessages = [
+    'Gemini sedang menganalisis...',
+    'Data sedang diseduh oleh AI...',
+    'Menunggu inspirasi algoritma...',
+    'Menelusuri kemungkinan tak terbatas...'
+  ];
+
+  const resultMessages = [
+    'Data menunjukkan hasil positif! 🎉',
+    'AI mendeteksi pola yang unik! 🔎',
+    'Tidak ditemukan anomali berarti. ✅',
+    'Saran AI: Perlu peninjauan manual. ⚠️'
+  ];
+
+  // Simulasi proses analisa AI
+  function showAIAnalysis() {
+    const title = titles[Math.floor(Math.random() * titles.length)];
+    const status = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+    const result = resultMessages[Math.floor(Math.random() * resultMessages.length)];
+
+    document.getElementById('ai-title').innerText = title;
+    document.getElementById('ai-status-text').innerText = status;
+    document.getElementById('ai-loader').classList.remove('hidden');
+    document.getElementById('ai-result-content').classList.add('hidden');
+
+    setTimeout(() => {
+      document.getElementById('ai-loader').classList.add('hidden');
+      document.getElementById('ai-message').innerText = result;
+      document.getElementById('ai-result-content').classList.remove('hidden');
+    }, 3000 + Math.random() * 2000); // delay antara 3-5 detik
+  }
+
+  // Otomatis jalan pas halaman dimuat
+  window.addEventListener('load', showAIAnalysis);
+</script>
+
                 <div id="ai-result-content" class="p-4 bg-blue-50 rounded-lg hidden">
                     <!-- AI results will be injected here -->
                 </div>
