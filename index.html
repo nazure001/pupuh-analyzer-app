@@ -326,16 +326,19 @@ function initSpeechRecognition() {
     recognition.continuous = true;
 
     let finalTranscript = '';
-    recognition.onresult = (event) => {
+   recognition.onresult = (event) => {
         let interimTranscript = '';
-        finalTranscript = ''; // Reset to capture the latest final transcript
+        let newFinalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
+                // Accumulate new final results
+                newFinalTranscript += event.results[i][0].transcript + ' ';
             } else {
                 interimTranscript += event.results[i][0].transcript;
             }
         }
+        // Append new final results to the persistent finalTranscript
+        finalTranscript += newFinalTranscript;
         transcriptEl.innerHTML = `<span class="text-black">${finalTranscript}</span><span class="text-gray-500">${interimTranscript}</span>`;
     };
     
