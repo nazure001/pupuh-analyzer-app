@@ -194,6 +194,8 @@ let isRecording = false;
 let animationFrameId;
 let pitchChart, volumeChart;
 let pitchData = [], volumeData = [], timeLabels = [];
+let recordedPitchContour = []; // Store pitch data for AI analysis
+let finalTranscript = '';
 
 const MIN_PITCH_HZ = 80; // C2
 const MAX_PITCH_HZ = 1100; // C6
@@ -224,7 +226,8 @@ analyzeTextBtn.addEventListener('click', () => {
     const lyrics = manualLyricsEl.value;
     const pupuhType = pupuhSelectManual.value;
     if (lyrics.trim()) {
-        analyzeWithGemini(lyrics, pupuhType);
+        // For manual analysis, we don't have pitch data, so we pass null
+        analyzeWithGemini(lyrics, pupuhType, null);
     } else {
         alert('Harap masukkan lirik terlebih dahulu.');
     }
@@ -242,7 +245,7 @@ const chartDefaultOptions = {
         }
     },
     plugins: { legend: { display: false } },
-    animation: { duration: 0 } // Disable animation for real-time feel
+    animation: { duration: 0 }
 };
 
 function initCharts() {
@@ -278,7 +281,10 @@ function startRecording() {
             toggleBtn.classList.replace('bg-blue-600', 'bg-red-600');
 
             pitchData = []; volumeData = []; timeLabels = [];
+            recordedPitchContour = []; // Reset recorded data
+            finalTranscript = '';
             transcriptEl.textContent = 'Mendengarkan...';
+            aiResultContent.classList.add('hidden'); // Hide previous results
 
             initSpeechRecognition();
             recognition.start();
@@ -296,7 +302,7 @@ function stopRecording() {
     toggleBtn.classList.replace('bg-red-600', 'bg-blue-600');
 
     if (stream) stream.getTracks().forEach(track => track.stop());
-    if (audioContext) audioContext.close();
+    if (audioContext && audioContext.state !== 'closed') audioContext.close();
     cancelAnimationFrame(animationFrameId);
     if(recognition) recognition.stop();
 }
@@ -308,7 +314,7 @@ function calculatePitch(freqData) {
     let maxVal = -1, maxBinIndex = -1;
 
     for (let i = minBin; i <= maxBin; i++) {
-        if (freqData[i] > maxVal && freqData[i] > 128) { // Threshold to ignore noise
+        if (freqData[i] > maxVal && freqData[i] > 128) {
             maxVal = freqData[i];
             maxBinIndex = i;
         }
@@ -322,7 +328,7 @@ function calculatePitch(freqData) {
 function calculateVolume(timeData) {
     let sumSquares = 0.0;
     for (const amplitude of timeData) {
-        const val = (amplitude / 128.0) - 1.0; // -1 to 1
+        const val = (amplitude / 128.0) - 1.0;
         sumSquares += val * val;
     }
     return Math.sqrt(sumSquares / timeData.length);
@@ -344,8 +350,12 @@ function processAudio() {
     const now = new Date().toLocaleTimeString().split(" ")[0];
 
     timeLabels.push(now);
-    pitchData.push(pitch > 0 ? pitch : null); // Push null for silence to create gaps
+    pitchData.push(pitch > 0 ? pitch : null);
     volumeData.push(volume);
+    if (pitch > 0) {
+        recordedPitchContour.push(Math.round(pitch)); // Store pitch data for AI
+    }
+
 
     const maxDataPoints = 50;
     if(timeLabels.length > maxDataPoints) {
@@ -377,38 +387,61 @@ function initSpeechRecognition() {
     recognition.interimResults = true;
     recognition.continuous = true;
 
-    let finalTranscript = '';
-   recognition.onresult = (event) => {
+    recognition.onresult = (event) => {
         let interimTranscript = '';
         let newFinalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
-                // Accumulate new final results
                 newFinalTranscript += event.results[i][0].transcript + ' ';
             } else {
                 interimTranscript += event.results[i][0].transcript;
             }
         }
-        // Append new final results to the persistent finalTranscript
         finalTranscript += newFinalTranscript;
         transcriptEl.innerHTML = `<span class="text-black">${finalTranscript}</span><span class="text-gray-500">${interimTranscript}</span>`;
     };
     
     recognition.onend = () => {
         if(isRecording) stopRecording();
-        setTimeout(() => {
-            const currentTranscript = transcriptEl.querySelector('span.text-black')?.textContent || '';
-             if(currentTranscript.trim()){
-               analyzeWithGemini(currentTranscript, pupuhSelectLive.value);
-            }
-        }, 300); // Small delay to ensure final transcript is settled
+        if(finalTranscript.trim()){
+           analyzeWithGemini(finalTranscript, pupuhSelectLive.value, recordedPitchContour);
+        }
     };
 }
 
 
-async function analyzeWithGemini(lyrics, pupuhType) {
+async function analyzeWithGemini(lyrics, pupuhType, pitchContourData) {
     aiLoader.classList.remove('hidden');
     aiResultContent.classList.add('hidden');
+
+    let pitchAnalysisPrompt = '';
+    if (pitchContourData && pitchContourData.length > 0) {
+        // Simplify pitch data to keep prompt size reasonable
+        const simplifiedPitchData = pitchContourData.slice(0, 150).join(', ');
+        pitchAnalysisPrompt = `
+2.  **Analisis Melodi (Cengkok & Laras)**: Berdasarkan data kontur melodi (pitch dalam Hz) berikut: [${simplifiedPitchData}], berikan evaluasi. Apakah cengkoknya sesuai untuk pupuh ini? Apakah nadanya terlalu tinggi, rendah, atau stabil?`;
+    }
+
+    const prompt = `Sebagai seorang ahli karawitan Sunda, berikan analisis komprehensif untuk penampilan Pupuh berikut.
+
+DATA YANG DISEDIAKAN:
+- **Jenis Pupuh**: ${pupuhType}
+- **Lirik yang Dinyanyikan**: "${lyrics}"
+${pitchContourData ? `- **Data Kontur Melodi (Pitch)**: Tersedia` : ''}
+
+TUGAS ANALISIS:
+1.  **Analisis Lirik (Guru Lagu & Wilangan)**: Periksa kesesuaian lirik dengan aturan. Sajikan dalam tabel Markdown.
+${pitchAnalysisPrompt}
+3.  **Saran Penjiwaan (Watek)**: Berikan saran singkat mengenai karakter yang harus disampaikan.
+
+Berikan output dalam format JSON dengan kunci "ruleAnalysis", "melodyAnalysis" (jika data pitch ada, jika tidak, isi dengan "Analisis melodi tidak tersedia."), dan "performanceTip".`;
+
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+            responseMimeType: "application/json",
+        }
+    };
 
     // Alamat API sekarang mengarah ke fungsi serverless kita
     const apiUrl = '/api/analyze';
@@ -439,12 +472,23 @@ async function analyzeWithGemini(lyrics, pupuhType) {
 }
 
 function displayAIResults(data) {
+    let melodyHtml = '';
+    if (data.melodyAnalysis && data.melodyAnalysis !== "Analisis melodi tidak tersedia.") {
+        melodyHtml = `
+            <div>
+                <h4 class="font-semibold text-lg">Analisis Melodi (Cengkok & Laras):</h4>
+                <p class="text-gray-700">${data.melodyAnalysis}</p>
+            </div>
+        `;
+    }
+
     const html = `
         <div class="space-y-4">
             <div>
                 <h4 class="font-semibold text-lg">Analisis Aturan (Guru Lagu & Wilangan):</h4>
                 <pre class="text-sm bg-gray-200 p-3 rounded-md overflow-x-auto whitespace-pre-wrap font-mono">${data.ruleAnalysis || '-'}</pre>
             </div>
+            ${melodyHtml}
             <div>
                 <h4 class="font-semibold text-lg">Saran Penjiwaan (Watek):</h4>
                 <p class="text-gray-700 italic">${data.performanceTip || 'Tidak ada saran.'}</p>
@@ -457,7 +501,6 @@ function displayAIResults(data) {
 document.addEventListener('DOMContentLoaded', () => {
     initCharts();
 });
-
 </script>
 </body>
 </html>
