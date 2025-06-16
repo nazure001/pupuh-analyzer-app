@@ -154,6 +154,7 @@
     document.getElementById('ai-status-text').innerText = status;
     document.getElementById('ai-loader').classList.remove('hidden');
     document.getElementById('ai-result-content').classList.add('hidden');
+    document.getElementById('toggleBtn').addEventListener('click', showAIAnalysis);
 
     setTimeout(() => {
       document.getElementById('ai-loader').classList.add('hidden');
@@ -162,8 +163,8 @@
     }, 3000 + Math.random() * 2000); // delay antara 3-5 detik
   }
 
-  // Otomatis jalan pas halaman dimuat
-  window.addEventListener('load', showAIAnalysis);
+  // Fungsi ini bisa dipanggil setelah tombol rekam di-stop
+  // Contoh: document.getElementById('rekamStopBtn').addEventListener('click', showAIAnalysis);
 </script>
 
                 <div id="ai-result-content" class="p-4 bg-blue-50 rounded-lg hidden">
