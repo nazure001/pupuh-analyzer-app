@@ -154,8 +154,7 @@
     document.getElementById('ai-status-text').innerText = status;
     document.getElementById('ai-loader').classList.remove('hidden');
     document.getElementById('ai-result-content').classList.add('hidden');
-    document.getElementById('toggleBtn').addEventListener('click', showAIAnalysis);
-
+    
     setTimeout(() => {
       document.getElementById('ai-loader').classList.add('hidden');
       document.getElementById('ai-message').innerText = result;
@@ -164,7 +163,7 @@
   }
 
   // Fungsi ini bisa dipanggil setelah tombol rekam di-stop
-  // Contoh: document.getElementById('rekamStopBtn').addEventListener('click', showAIAnalysis);
+  document.getElementById('toggleBtn').addEventListener('click', showAIAnalysis);
 </script>
 
                 <div id="ai-result-content" class="p-4 bg-blue-50 rounded-lg hidden">
