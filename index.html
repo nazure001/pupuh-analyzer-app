@@ -142,13 +142,12 @@ let isRecording = false;
 let animationFrameId;
 let pitchChart, volumeChart;
 let pitchData = [], volumeData = [], timeLabels = [];
-let recordedPitchContour = []; // Store pitch data for AI analysis
+let recordedPitchContour = [];
 let finalTranscript = '';
 
-const MIN_PITCH_HZ = 80; // C2
-const MAX_PITCH_HZ = 1100; // C6
+const MIN_PITCH_HZ = 80;
+const MAX_PITCH_HZ = 1100;
 
-// Tab switching logic
 tabLive.addEventListener('click', () => {
     contentLive.classList.remove('hidden');
     contentManual.classList.add('hidden');
@@ -164,17 +163,14 @@ tabManual.addEventListener('click', () => {
     if (isRecording) stopRecording();
 });
 
-// Live analysis toggle
 toggleBtn.addEventListener('click', () => {
     isRecording ? stopRecording() : startRecording();
 });
 
-// Manual text analysis button
 analyzeTextBtn.addEventListener('click', () => {
     const lyrics = manualLyricsEl.value;
     const pupuhType = pupuhSelectManual.value;
     if (lyrics.trim()) {
-        // For manual analysis, we don't have pitch data, so we pass null
         analyzeWithGemini(lyrics, pupuhType, null);
     } else {
         alert('Harap masukkan lirik terlebih dahulu.');
@@ -229,10 +225,10 @@ function startRecording() {
             toggleBtn.classList.replace('bg-blue-600', 'bg-red-600');
 
             pitchData = []; volumeData = []; timeLabels = [];
-            recordedPitchContour = []; // Reset recorded data
+            recordedPitchContour = [];
             finalTranscript = '';
             transcriptEl.textContent = 'Mendengarkan...';
-            aiResultContent.classList.add('hidden'); // Hide previous results
+            aiResultContent.classList.add('hidden');
 
             initSpeechRecognition();
             recognition.start();
@@ -301,7 +297,7 @@ function processAudio() {
     pitchData.push(pitch > 0 ? pitch : null);
     volumeData.push(volume);
     if (pitch > 0) {
-        recordedPitchContour.push(Math.round(pitch)); // Store pitch data for AI
+        recordedPitchContour.push(Math.round(pitch));
     }
 
 
@@ -357,58 +353,34 @@ function initSpeechRecognition() {
     };
 }
 
-
 async function analyzeWithGemini(lyrics, pupuhType, pitchContourData) {
     aiLoader.classList.remove('hidden');
     aiResultContent.classList.add('hidden');
 
-    let pitchAnalysisPrompt = '';
-    if (pitchContourData && pitchContourData.length > 0) {
-        // Simplify pitch data to keep prompt size reasonable
-        const simplifiedPitchData = pitchContourData.slice(0, 150).join(', ');
-        pitchAnalysisPrompt = `
-2.  **Analisis Melodi (Cengkok & Laras)**: Berdasarkan data kontur melodi (pitch dalam Hz) berikut: [${simplifiedPitchData}], berikan evaluasi. Apakah cengkoknya sesuai untuk pupuh ini? Apakah nadanya terlalu tinggi, rendah, atau stabil?`;
-    }
-
-    const prompt = `Sebagai seorang ahli karawitan Sunda, berikan analisis komprehensif untuk penampilan Pupuh berikut.
-
-DATA YANG DISEDIAKAN:
-- **Jenis Pupuh**: ${pupuhType}
-- **Lirik yang Dinyanyikan**: "${lyrics}"
-${pitchContourData ? `- **Data Kontur Melodi (Pitch)**: Tersedia` : ''}
-
-TUGAS ANALISIS:
-1.  **Analisis Lirik (Guru Lagu & Wilangan)**: Periksa kesesuaian lirik dengan aturan. Sajikan dalam tabel Markdown.
-${pitchAnalysisPrompt}
-3.  **Saran Penjiwaan (Watek)**: Berikan saran singkat mengenai karakter yang harus disampaikan.
-
-Berikan output dalam format JSON dengan kunci "ruleAnalysis", "melodyAnalysis" (jika data pitch ada, jika tidak, isi dengan "Analisis melodi tidak tersedia."), dan "performanceTip".`;
-
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-            responseMimeType: "application/json",
-        }
-    };
-   // Alamat API sekarang mengarah ke fungsi serverless kita
     const apiUrl = '/api/analyze';
+
     try {
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ 
+                lyrics: lyrics, 
+                pupuhType: pupuhType, 
+                pitchContourData: pitchContourData 
+            })
         });
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
-        
-        const result = await response.json();
-        const text = result.candidates[0].content.parts[0].text;
-        const data = JSON.parse(text);
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `API Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
         displayAIResults(data);
 
     } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        aiResultContent.innerHTML = `<p class="text-red-500">Gagal mendapatkan analisis dari AI. Coba lagi.</p>`;
+        console.error("Error calling backend API:", error);
+        aiResultContent.innerHTML = `<p class="text-red-500">Gagal mendapatkan analisis dari AI. ${error.message}</p>`;
     } finally {
         aiLoader.classList.add('hidden');
         aiResultContent.classList.remove('hidden');
